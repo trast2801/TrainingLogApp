@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import ttk, Toplevel, messagebox
 import json
 from datetime import datetime
+import pandas as pd
 
 # Файл для сохранения данных
-data_file = 'training_log.json'
+data_file = 'out/training_log.json'
+csv_file = 'out/training.csv'
 
 def load_data():
     """Загрузка данных о тренировках из файла."""
@@ -33,7 +35,7 @@ class TrainingLogApp:
         self.exercise_entry = ttk.Entry(self.root)
         self.exercise_entry.grid(column=1, row=0, sticky=tk.EW, padx=5, pady=5)
 
-        self.weight_label = ttk.Label(self.root, text="Вес:")
+        self.weight_label = ttk.Label(self.root, text="Вес, в кг:")
         self.weight_label.grid(column=0, row=1, sticky=tk.W, padx=5, pady=5)
 
         self.weight_entry = ttk.Entry(self.root)
@@ -45,11 +47,17 @@ class TrainingLogApp:
         self.repetitions_entry = ttk.Entry(self.root)
         self.repetitions_entry.grid(column=1, row=2, sticky=tk.EW, padx=5, pady=5)
 
-        self.add_button = ttk.Button(self.root, text="Добавить запись", command=self.add_entry)
-        self.add_button.grid(column=0, row=3, columnspan=2, pady=10)
+        self.add_button = ttk.Button(self.root,  text="Добавить      запись", command=self.add_entry)
+        self.add_button.grid(column=0, row=3, columnspan=2, pady=5)
 
-        self.view_button = ttk.Button(self.root, text="Просмотреть записи", command=self.view_records)
-        self.view_button.grid(column=0, row=4, columnspan=2, pady=10)
+        self.view_button = ttk.Button(self.root, text="Просмотреть записи ", command=self.view_records)
+        self.view_button.grid(column=0, row=4, columnspan=2, pady=5)
+
+        self.view_button = ttk.Button(self.root, text="В CSV", command=self.to_csv)
+        self.view_button.grid(column=0, row=5, columnspan=1, pady=5, padx=30)
+
+        self.view_button = ttk.Button(self.root, text="Из CSV", command=self.from_csv)
+        self.view_button.grid(column=1, row=5, columnspan=3, pady=5,padx=30)
 
     def add_entry(self):
         date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -93,6 +101,21 @@ class TrainingLogApp:
             tree.insert('', tk.END, values=(entry['date'], entry['exercise'], entry['weight'], entry['repetitions']))
 
         tree.pack(expand=True, fill=tk.BOTH)
+
+    def to_csv(self):
+        data = load_data()
+        # Создание DataFrame из словаря
+        df = pd.DataFrame(data)
+
+        # Экспорт DataFrame в CSV-файл
+        df.to_csv(csv_file, index=False)
+
+    def from_csv(self):
+        # Чтение CSV-файла
+        df = pd.read_csv(csv_file)
+
+        # Преобразование DataFrame в словарь
+        data = df.set_index('date').to_dict('index')
 
 def main():
     root = tk.Tk()
