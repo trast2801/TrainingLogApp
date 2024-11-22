@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, Toplevel, messagebox
+from tkinter import ttk, Toplevel, messagebox, simpledialog
 import json
 from datetime import datetime
 import pandas as pd
@@ -7,6 +7,7 @@ from tkcalendar import DateEntry
 
 # Файл для сохранения данных
 data_file = 'out/training_log.json'
+
 csv_file = 'out/training.csv'
 
 
@@ -43,13 +44,13 @@ class TrainingLogApp:
         self.date_end.grid(row=0, column=2, padx=10, pady=10, sticky="nesw")
         # Виджеты для ввода данных
         self.exercise_label = ttk.Label(self.root, text="Упражнение:")
-        self.exercise_label.grid(column=0, row=3, sticky=tk.W, padx=5, pady=5)
+        self.exercise_label.grid(column=0, row=4, sticky=tk.W, padx=5, pady=5)
 
         self.exercise_combobox = ttk.Combobox(self.root, values=self.list_exercise())
-        self.exercise_combobox.grid(column=1, row=3, sticky=tk.EW, padx=5, pady=5)
+        self.exercise_combobox.grid(column=1, row=4, sticky=tk.EW, padx=5, pady=5)
 
-        self.exercise_entry = ttk.Entry(self.root)
-        self.exercise_entry.grid(column=1, row=4, sticky=tk.EW, padx=5, pady=5)
+        # self.exercise_entry = ttk.Entry(self.root)
+        # self.exercise_entry.grid(column=1, row=4, sticky=tk.EW, padx=5, pady=5)
 
         self.weight_label = ttk.Label(self.root, text="Вес, в кг:")
         self.weight_label.grid(column=0, row=5, sticky=tk.W, padx=5, pady=5)
@@ -77,7 +78,7 @@ class TrainingLogApp:
 
     def add_entry(self):
         date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        exercise = self.exercise_entry.get()
+        exercise = self.exercise_combobox.get()
         weight = self.weight_entry.get()
         repetitions = self.repetitions_entry.get()
 
@@ -97,10 +98,17 @@ class TrainingLogApp:
         save_data(data)
 
         # Очистка полей ввода после добавления
-        self.exercise_entry.delete(0, tk.END)
+        self.exercise_combobox.delete(0, tk.END)
         self.weight_entry.delete(0, tk.END)
         self.repetitions_entry.delete(0, tk.END)
         messagebox.showinfo("Успешно", "Запись успешно добавлена!")
+
+
+        # for selected_item in tree.selection():
+        #     item = tree.item(selected_item)
+        #     person = item["values"]
+        #     selected_people = f"{selected_people}{person}\n"
+        # label["text"] = selected_people
 
     def view_records(self):
         data = load_data()
@@ -119,12 +127,57 @@ class TrainingLogApp:
 
         for entry in data:
             entry_date = datetime.strptime(entry['date'], '%Y-%m-%d %H:%M:%S').date()
-            if entry_date > start_date and entry_date < end_date:
+            if entry_date >= start_date and entry_date <= end_date:
                 if entry['exercise'] ==  self.exercise_combobox.get():
+                    tree.insert('', tk.END,
+                                values=(entry['date'], entry['exercise'], entry['weight'], entry['repetitions']))
+                elif self.exercise_combobox.get() == '':
                     tree.insert('', tk.END,
                                 values=(entry['date'], entry['exercise'], entry['weight'], entry['repetitions']))
 
         tree.pack(expand=True, fill=tk.BOTH)
+
+
+        def write_change():
+            '''сохраняет в json файл изменения в tree'''
+            values = []
+            for k in tree.get_children(""):
+                item = tree.item(k)
+                values.append(item['values'])
+
+            data = pd.DataFrame(values)
+            data.columns = ['date', 'exercise', 'weight', 'repetitions']
+            data.to_json(data_file, orient='records', lines=False)
+        def update_item():
+            '''редактирует выбранную запись '''
+            selected = tree.focus()
+            temp = tree.item(selected, 'values')
+
+            column1 = simpledialog.askstring(" ", "Введите упражнение:", initialvalue=temp[1])
+            column2 = simpledialog.askstring(" ", "Введите вес:", initialvalue=temp[2])
+            column3 = simpledialog.askstring(" ", "Введите повтор:", initialvalue=temp[3])
+            # Обновляем строку с новым значением
+            values = (temp[0],column1, column2,column3)
+            tree.item(selected, values=values)
+            write_change()
+        def save_after_delete():
+            '''сохраняет список после удаления в файл'''
+            delete_item()
+            write_change()
+        def delete_item():
+
+            # удаляет запись из tree
+            selected_item = tree.selection()[0]
+            tree.delete(selected_item)
+
+
+        view_button1= ttk.Button(records_window , text='изменить запись', command=update_item).pack()
+        view_button2 = ttk.Button(records_window, text='удалить запись', command=save_after_delete).pack()
+
+
+        # temp = record.item(selected, 'values')
+        # sal_up = float(temp[2]) + float(temp[2]) * 0.05
+        # record.item(selected, values=(temp[0], temp[1], sal_up))
 
     def to_csv(self):
         data = load_data()
@@ -151,6 +204,8 @@ class TrainingLogApp:
             exercises.append(entry['exercise'])
         exercises = list(set(exercises))
         return exercises
+
+
 
 def main():
     root = tk.Tk()
