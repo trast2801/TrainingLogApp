@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import pandas as pd
 from tkcalendar import DateEntry
+import re
 
 # Файл для сохранения данных
 data_file = 'out/training_log.json'
@@ -34,6 +35,7 @@ class TrainingLogApp:
 
     def create_widgets(self):
 
+
         self.exercise_label = ttk.Label(self.root, text="период")
         self.exercise_label.grid(column=0, row=0, sticky="new", padx=5, pady=5)
 
@@ -55,13 +57,17 @@ class TrainingLogApp:
         self.weight_label = ttk.Label(self.root, text="Вес, в кг:")
         self.weight_label.grid(column=0, row=5, sticky=tk.W, padx=5, pady=5)
 
-        self.weight_entry = ttk.Entry(self.root)
+        def is_valid(newval):
+            return re.match("\d", newval) is not None
+
+        check = (self.root.register(is_valid), "%P")
+        self.weight_entry = ttk.Entry(self.root,validate="key",  validatecommand=check)
         self.weight_entry.grid(column=1, row=5, sticky=tk.EW, padx=5, pady=5)
 
         self.repetitions_label = ttk.Label(self.root, text="Повторения:")
         self.repetitions_label.grid(column=0, row=6, sticky=tk.W, padx=5, pady=5)
 
-        self.repetitions_entry = ttk.Entry(self.root)
+        self.repetitions_entry = ttk.Entry(self.root, validate="key",  validatecommand=check)
         self.repetitions_entry.grid(column=1, row=6, sticky=tk.EW, padx=5, pady=5)
 
         self.add_button = ttk.Button(self.root, text="Добавить      запись", command=self.add_entry)
@@ -102,13 +108,6 @@ class TrainingLogApp:
         self.weight_entry.delete(0, tk.END)
         self.repetitions_entry.delete(0, tk.END)
         messagebox.showinfo("Успешно", "Запись успешно добавлена!")
-
-
-        # for selected_item in tree.selection():
-        #     item = tree.item(selected_item)
-        #     person = item["values"]
-        #     selected_people = f"{selected_people}{person}\n"
-        # label["text"] = selected_people
 
     def view_records(self):
         data = load_data()
@@ -204,6 +203,12 @@ class TrainingLogApp:
             exercises.append(entry['exercise'])
         exercises = list(set(exercises))
         return exercises
+
+    def validate_number(P):
+        """Функция для проверки, является ли введённое значение числом."""
+        if P.isdigit() or P == "":
+            return True
+        return False
 
 
 
