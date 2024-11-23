@@ -35,6 +35,8 @@ class TrainingLogApp:
 
     def create_widgets(self):
 
+        def is_valid(newval):
+            return re.match("\d", newval) is not None
 
         self.exercise_label = ttk.Label(self.root, text="период")
         self.exercise_label.grid(column=0, row=0, sticky="new", padx=5, pady=5)
@@ -57,17 +59,14 @@ class TrainingLogApp:
         self.weight_label = ttk.Label(self.root, text="Вес, в кг:")
         self.weight_label.grid(column=0, row=5, sticky=tk.W, padx=5, pady=5)
 
-        def is_valid(newval):
-            return re.match("\d", newval) is not None
-
         check = (self.root.register(is_valid), "%P")
-        self.weight_entry = ttk.Entry(self.root,validate="key",  validatecommand=check)
+        self.weight_entry = ttk.Entry(self.root, validate="key", validatecommand=check)
         self.weight_entry.grid(column=1, row=5, sticky=tk.EW, padx=5, pady=5)
 
         self.repetitions_label = ttk.Label(self.root, text="Повторения:")
         self.repetitions_label.grid(column=0, row=6, sticky=tk.W, padx=5, pady=5)
 
-        self.repetitions_entry = ttk.Entry(self.root, validate="key",  validatecommand=check)
+        self.repetitions_entry = ttk.Entry(self.root, validate="key", validatecommand=check)
         self.repetitions_entry.grid(column=1, row=6, sticky=tk.EW, padx=5, pady=5)
 
         self.add_button = ttk.Button(self.root, text="Добавить      запись", command=self.add_entry)
@@ -76,11 +75,14 @@ class TrainingLogApp:
         self.view_button = ttk.Button(self.root, text="Просмотреть записи ", command=self.view_records)
         self.view_button.grid(column=0, row=8, columnspan=3, pady=5)
 
+        self.view_button = ttk.Button(self.root, text="Показать статистику ", command=self.show_statistics)
+        self.view_button.grid(column=0, row=9, columnspan=3, pady=5)
+
         self.view_button = ttk.Button(self.root, text="В CSV", command=self.to_csv)
-        self.view_button.grid(column=0, row=9, columnspan=1, pady=5, padx=30)
+        self.view_button.grid(column=0, row=10, columnspan=1, pady=5, padx=30)
 
         self.view_button = ttk.Button(self.root, text="Из CSV", command=self.from_csv)
-        self.view_button.grid(column=1, row=9, columnspan=8, pady=5, padx=30)
+        self.view_button.grid(column=2, row=10, columnspan=2, pady=5, padx=30)
 
     def add_entry(self):
         date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -127,7 +129,7 @@ class TrainingLogApp:
         for entry in data:
             entry_date = datetime.strptime(entry['date'], '%Y-%m-%d %H:%M:%S').date()
             if entry_date >= start_date and entry_date <= end_date:
-                if entry['exercise'] ==  self.exercise_combobox.get():
+                if entry['exercise'] == self.exercise_combobox.get():
                     tree.insert('', tk.END,
                                 values=(entry['date'], entry['exercise'], entry['weight'], entry['repetitions']))
                 elif self.exercise_combobox.get() == '':
@@ -135,7 +137,6 @@ class TrainingLogApp:
                                 values=(entry['date'], entry['exercise'], entry['weight'], entry['repetitions']))
 
         tree.pack(expand=True, fill=tk.BOTH)
-
 
         def write_change():
             '''сохраняет в json файл изменения в tree'''
@@ -147,6 +148,7 @@ class TrainingLogApp:
             data = pd.DataFrame(values)
             data.columns = ['date', 'exercise', 'weight', 'repetitions']
             data.to_json(data_file, orient='records', lines=False)
+
         def update_item():
             '''редактирует выбранную запись '''
             selected = tree.focus()
@@ -156,23 +158,23 @@ class TrainingLogApp:
             column2 = simpledialog.askstring(" ", "Введите вес:", initialvalue=temp[2])
             column3 = simpledialog.askstring(" ", "Введите повтор:", initialvalue=temp[3])
             # Обновляем строку с новым значением
-            values = (temp[0],column1, column2,column3)
+            values = (temp[0], column1, column2, column3)
             tree.item(selected, values=values)
             write_change()
+
         def save_after_delete():
             '''сохраняет список после удаления в файл'''
             delete_item()
             write_change()
+
         def delete_item():
 
             # удаляет запись из tree
             selected_item = tree.selection()[0]
             tree.delete(selected_item)
 
-
-        view_button1= ttk.Button(records_window , text='изменить запись', command=update_item).pack()
+        view_button1 = ttk.Button(records_window, text='изменить запись', command=update_item).pack()
         view_button2 = ttk.Button(records_window, text='удалить запись', command=save_after_delete).pack()
-
 
         # temp = record.item(selected, 'values')
         # sal_up = float(temp[2]) + float(temp[2]) * 0.05
@@ -210,6 +212,53 @@ class TrainingLogApp:
             return True
         return False
 
+    def show_statistics(self):
+        '''Фуункция вывода статистики по упражнениям'''
+        df = pd.read_json(data_file)
+        # Количество выполненных упражнений
+        exercises_count = df['exercise'].value_counts().to_dict()
+
+        # Суммарное количество повторений по каждому упражнению
+        repetitions_sum = df.groupby('exercise')['repetitions'].sum().to_dict()
+
+        # Средняя нагрузка (вес * повторения) по каждому виду упражнения
+        load_avg = (df.groupby('exercise').apply(lambda x: (x['weight'] * x['repetitions']).mean())).to_dict()
+
+        # Среднее количество повторений для каждого вида упражнения
+        reps_avg = df.groupby('exercise')['repetitions'].mean().to_dict()
+
+        # Форматируем данные для отображения
+        rows = []
+        for exercise, count in exercises_count.items():
+            row = {
+                'Упражнение': exercise,
+                'Количество выполнений': count,
+                'Сумма повторений': repetitions_sum[exercise],
+                'Средняя нагрузка': round(load_avg[exercise], 2),
+                'Среднее количество повторений': round(reps_avg[exercise], 2)
+            }
+            rows.append(row)
+
+        # Создаем DataFrame для отображения
+        stats_df = pd.DataFrame(rows)
+
+        # Показываем статистику в отдельном окне Tkinter
+        stat_window = tk.Toplevel()
+        stat_window.title("Статистика")
+
+        tree = ttk.Treeview(stat_window, columns=list(stats_df.columns), show='headings')
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        vsb = ttk.Scrollbar(stat_window, orient="vertical", command=tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tree.configure(yscrollcommand=vsb.set)
+
+        for col in stats_df.columns:
+            tree.heading(col, text=col)
+
+        for index, row in stats_df.iterrows():
+            tree.insert("", "end", values=list(row))
 
 
 def main():
