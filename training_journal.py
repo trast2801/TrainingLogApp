@@ -5,12 +5,14 @@ from datetime import datetime
 import pandas as pd
 from tkcalendar import DateEntry
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 # Файл для сохранения данных
 data_file = 'out/training_log.json'
 
 csv_file = 'out/training.csv'
-
 
 def load_data():
     """Загрузка данных о тренировках из файла."""
@@ -78,11 +80,14 @@ class TrainingLogApp:
         self.view_button = ttk.Button(self.root, text="Показать статистику ", command=self.show_statistics)
         self.view_button.grid(column=0, row=9, columnspan=3, pady=5)
 
+        self.view_button = ttk.Button(self.root, text="График прогресса ", command=self.grafik)
+        self.view_button.grid(column=0, row=10, columnspan=3, pady=5)
+
         self.view_button = ttk.Button(self.root, text="В CSV", command=self.to_csv)
-        self.view_button.grid(column=0, row=10, columnspan=1, pady=5, padx=30)
+        self.view_button.grid(column=0, row=11, columnspan=1, pady=5, padx=30)
 
         self.view_button = ttk.Button(self.root, text="Из CSV", command=self.from_csv)
-        self.view_button.grid(column=2, row=10, columnspan=2, pady=5, padx=30)
+        self.view_button.grid(column=2, row=11, columnspan=2, pady=5, padx=30)
 
     def add_entry(self):
         date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -126,6 +131,11 @@ class TrainingLogApp:
         tree.heading('Вес', text="Вес")
         tree.heading('Повторения', text="Повторения")
 
+        vsb = ttk.Scrollbar(records_window, orient="vertical", command=tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tree.configure(yscrollcommand=vsb.set)
+
         for entry in data:
             entry_date = datetime.strptime(entry['date'], '%Y-%m-%d %H:%M:%S').date()
             if entry_date >= start_date and entry_date <= end_date:
@@ -147,7 +157,7 @@ class TrainingLogApp:
 
             data = pd.DataFrame(values)
             data.columns = ['date', 'exercise', 'weight', 'repetitions']
-            data.to_json(data_file, orient='records', lines=False)
+            data.to_json(data_file, orient='table', lines=True)
 
         def update_item():
             '''редактирует выбранную запись '''
@@ -173,12 +183,9 @@ class TrainingLogApp:
             selected_item = tree.selection()[0]
             tree.delete(selected_item)
 
-        view_button1 = ttk.Button(records_window, text='изменить запись', command=update_item).pack()
-        view_button2 = ttk.Button(records_window, text='удалить запись', command=save_after_delete).pack()
+            ttk.Button(records_window, text='изменить запись', command=update_item).pack()
+            ttk.Button(records_window, text='удалить запись', command=save_after_delete).pack()
 
-        # temp = record.item(selected, 'values')
-        # sal_up = float(temp[2]) + float(temp[2]) * 0.05
-        # record.item(selected, values=(temp[0], temp[1], sal_up))
 
     def to_csv(self):
         data = load_data()
@@ -194,7 +201,9 @@ class TrainingLogApp:
         df = pd.read_csv(csv_file)
 
         # Преобразование DataFrame в словарь
-        data = df.set_index('date').to_dict('index')
+        # data = df.set_index('date').to_dict('index')
+        # Экспорт DataFrame в json-файл
+        df.to_json(data_file, orient='records', lines=False)
         messagebox.showinfo("Успех", "Данные успешно импортированы в CSV файл.")
 
     def list_exercise(self) -> set:
@@ -259,6 +268,40 @@ class TrainingLogApp:
 
         for index, row in stats_df.iterrows():
             tree.insert("", "end", values=list(row))
+
+    def grafik(self):
+        '''Функция отражает график по весами по повторениям вразрезе дней и упражнений'''
+        df = pd.read_json('out/training_log.json')
+        start_date = self.date_begin.get_date()
+        end_date = self.date_end.get_date()
+        start_date = pd.to_datetime(start_date)
+        end_date = pd.to_datetime(end_date)
+
+        # Преобразуем дату в формат datetime
+        df['date'] = pd.to_datetime(df['date'],  format='%Y-%m-%d %H:%M:%S')
+        filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+
+        # Создадим отдельные датафреймы для веса и повторений
+        weight_df = filtered_df.pivot(index='date', columns='exercise', values='weight')
+        reps_df = filtered_df.pivot(index='date', columns='exercise', values='repetitions')
+
+        # Постороим график изменения веса по упражнениям
+        plt.figure(figsize=(12, 6))
+        sns.lineplot(data=weight_df, dashes=False)
+        plt.title('График изменения веса по упражнениям')
+        plt.xlabel('Дата')
+        plt.ylabel('Вес')
+        plt.legend(title='Упражнения')
+        plt.show()
+
+        # Постороим график изменения количества повторений по упражнениям
+        plt.figure(figsize=(12, 6))
+        sns.lineplot(data=reps_df, dashes=False)
+        plt.title('График изменения количества повторений по упражнениям')
+        plt.xlabel('Дата')
+        plt.ylabel('Повторения')
+        plt.legend(title='Упражнения')
+        plt.show()
 
 
 def main():
